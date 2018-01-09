@@ -94,9 +94,9 @@ def run_several_expo(n_iter, beta_true, size_data_list, C, beta0_prior_list,
                                n_samples, burn, thin)
                 
                 pm.traceplot(trace);
-                plt.savefig("outputs/quasi_bayesian/" + "N: {}, beta0_prior: {}, beta1_prior: {}, alpha_prior: {}_{}".format(
-                    str(N), str(beta0_prior), str(beta1_prior),  str(alpha_prior), i), format="png")
-                
+                plt.savefig("outputs/quasi_bayesian/" + "N: {}, beta0_prior: {}, beta1_prior: {}, alpha_prior: {}_{}.png".format(
+                    str(N), str(beta0_prior), str(beta1_prior),  str(alpha_prior), i))
+                plt.close()
                 
                 if plot:
                     print("beta0 mean a quasi posteriori : ", trace['beta0'].mean())
