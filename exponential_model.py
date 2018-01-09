@@ -1,19 +1,19 @@
+import matplotlib
+matplotlib.use('Agg')
+
 from matplotlib import pyplot as plt
 import numpy as np
 import pymc3 as pm
-#from pymc3.distributions.timeseries import GaussianRandomWalk
 import seaborn as sns
-#from statsmodels import datasets
 from theano import tensor as T
 import pandas
 import itertools
 
 from construct_data import construct_data
 
-import matplotlib
-matplotlib.use('Agg')
 
-def sample_quasi_posterior(data, Y, C, beta0_prior, beta1_prior, alpha_prior,
+
+def sample_quasi_posterior(data, data_test, Y, C, beta0_prior, beta1_prior, alpha_prior,
                            n_samples, burn, thin=20):
 
     with pm.Model() as exponential_quasi_bayesian:
@@ -59,6 +59,10 @@ def sample_quasi_posterior(data, Y, C, beta0_prior, beta1_prior, alpha_prior,
             out = ((y_hat - failure)**2).mean()
             return -alpha*out
         
+        #Posterior Predictive Distribution
+        lambda_test = pm.Deterministic('lambda_test', T.exp(beta0*data_test.a + beta1*data_test.b))
+        y_pred = pm.Deterministic('y_pred', (1 - T.exp(-C*lambda_test))/lambda_test)
+        
         exp_surv = pm.DensityDist('exp_surv', log_exp_risk, observed={'failure':Y.time})
     
     # --SAMPLES --
@@ -75,13 +79,17 @@ def run_several_expo(n_iter, beta_true, size_data_list, C, beta0_prior_list,
     prior_grid = list(itertools.product(*[beta0_prior_list, beta1_prior_list, alpha_prior_list]))
     
     param_results = {'n_iter': [], 'N': [], 'beta0_prior': [], 'beta1_prior': [],
-                     'alpha_prior': [], 'beta0_MQP': [], 'beta1_MQP': []}
+                     'alpha_prior': [], 'beta0_MQP': [], 'beta1_MQP': [], 'mse':[]}
     
     for N in size_data_list:
         data, Y, delta_list = construct_data(beta_true, N, C)
         data = pandas.DataFrame(data)
         data = data.rename(index=str, columns={0: "a", 1: "b"})
-
+        
+        data_test, Y_test, delta_list_test = construct_data(beta_true, 2000, C)
+        data_test = pandas.DataFrame(data_test)
+        data_test = data.rename(index=str, columns={0: "a", 1: "b"})
+        
         Y = pandas.DataFrame(Y)
         Y = Y.rename(index=str, columns={0: "time"}) #death time
 
@@ -89,17 +97,22 @@ def run_several_expo(n_iter, beta_true, size_data_list, C, beta0_prior_list,
         
         for beta0_prior, beta1_prior, alpha_prior in prior_grid:
             for i in range(n_iter):
-                trace = sample_quasi_posterior(data, Y, C, beta0_prior, beta1_prior, alpha_prior,
+                trace = sample_quasi_posterior(data, data_test, Y, C, beta0_prior, beta1_prior, alpha_prior,
                                n_samples, burn, thin)
                 
                 pm.traceplot(trace);
                 plt.savefig("N: {}, beta0_prior: {}, beta1_prior: {}, alpha_prior: {}_{}".format(
                     str(N), str(beta0_prior), str(beta1_prior),  str(alpha_prior), i), format="png")
                 
+                #Posterior Prediction
+                Y_pred = trace["y_pred"].mean(axis=0)
+                mse = ((Y_test - Y_pred)**2).mean()
+                
                 if plot:
                     print("beta0 mean a quasi posteriori : ", trace['beta0'].mean())
                     print("beta1 mean a quasi posteriori : ", trace['beta1'].mean())
-                
+                    print("Mean Squared Error: %0.2f" % mse)
+                    
                 param_results['n_iter'].append(i)
                 param_results['N'].append(N)
                 param_results['beta0_prior'].append(beta0_prior)
@@ -107,4 +120,5 @@ def run_several_expo(n_iter, beta_true, size_data_list, C, beta0_prior_list,
                 param_results['alpha_prior'].append(alpha_prior)
                 param_results['beta0_MQP'].append(trace['beta0'].mean())
                 param_results['beta1_MQP'].append(trace['beta1'].mean())
+                param_results['mse'].append(mse)
     return pandas.DataFrame(param_results)
