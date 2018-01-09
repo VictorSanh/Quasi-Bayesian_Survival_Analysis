@@ -5,8 +5,13 @@ import pymc3 as pm
 import seaborn as sns
 #from statsmodels import datasets
 from theano import tensor as T
-import pandas as pd
+import pandas
 import itertools
+
+from construct_data import construct_data
+
+import matplotlib
+matplotlib.use('Agg')
 
 def sample_quasi_posterior(data, Y, C, beta0_prior, beta1_prior, alpha_prior,
                            n_samples, burn, thin=20):
@@ -87,8 +92,11 @@ def run_several_expo(n_iter, beta_true, size_data_list, C, beta0_prior_list,
                 trace = sample_quasi_posterior(data, Y, C, beta0_prior, beta1_prior, alpha_prior,
                                n_samples, burn, thin)
                 
+                pm.traceplot(trace);
+                plt.savefig("N: {}, beta0_prior: {}, beta1_prior: {}, alpha_prior: {}_{}".format(
+                    str(N), str(beta0_prior), str(beta1_prior),  str(alpha_prior), i), format="png")
+                
                 if plot:
-                    pm.traceplot(trace);
                     print("beta0 mean a quasi posteriori : ", trace['beta0'].mean())
                     print("beta1 mean a quasi posteriori : ", trace['beta1'].mean())
                 
@@ -99,4 +107,4 @@ def run_several_expo(n_iter, beta_true, size_data_list, C, beta0_prior_list,
                 param_results['alpha_prior'].append(alpha_prior)
                 param_results['beta0_MQP'].append(trace['beta0'].mean())
                 param_results['beta1_MQP'].append(trace['beta1'].mean())
-    return pd.DataFrame(param_results)
+    return pandas.DataFrame(param_results)
